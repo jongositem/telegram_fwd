@@ -1,6 +1,6 @@
 # Telegram Message Forwarder Bot
 
-A Python bot that automatically forwards messages from Contact A to Contact B using Telegram's user account API.
+A Python bot that automatically forwards messages from Contact A to Contact B using Telegram's user account API. Designed for easy deployment with Docker.
 
 ## Features
 
@@ -9,157 +9,181 @@ A Python bot that automatically forwards messages from Contact A to Contact B us
 - ✅ Handles rate limiting automatically
 - ✅ Comprehensive logging
 - ✅ Easy configuration via environment variables
-- ✅ Uses `uv` for fast dependency management
+- ✅ **Docker support for containerized deployment**
+- ✅ Persistent session storage
 
-## Prerequisites
+## Quick Start (Docker - Recommended)
 
-- Python 3.8 or higher
+### Prerequisites
+
+- Docker and Docker Compose installed
+- Telegram account
+- Telegram API credentials
+
+### 1. Get Telegram API Credentials
+
+1. Go to https://my.telegram.org
+2. Log in with your phone number
+3. Click **"API development tools"**
+4. Create a new application
+5. Note down your `api_id` and `api_hash`
+
+### 2. Configure
+
+```bash
+# Copy environment template
+cp .env.example .env
+
+# Edit with your credentials
+nano .env
+```
+
+Fill in your `.env`:
+
+```env
+API_ID=12345678
+API_HASH=your_api_hash_here
+PHONE_NUMBER=+1234567890
+CONTACT_A=@source_username
+CONTACT_B=@destination_username
+```
+
+### 3. Deploy with Docker
+
+```bash
+# Build and start the bot
+docker-compose up -d
+
+# First run: authenticate interactively
+docker-compose up
+
+# Enter verification code when prompted
+# After authentication, press Ctrl+C and run:
+docker-compose up -d
+```
+
+### 4. Manage the Bot
+
+```bash
+# View logs
+docker-compose logs -f
+
+# Stop the bot
+docker-compose down
+
+# Restart the bot
+docker-compose restart
+
+# Check status
+docker-compose ps
+```
+
+That's it! The bot is now running and will automatically forward messages from Contact A to Contact B.
+
+## Alternative: Local Installation (without Docker)
+
+If you prefer to run without Docker, use `uv` for fast dependency management:
+
+### Prerequisites
+
+- Python 3.8+
 - [uv](https://github.com/astral-sh/uv) package manager
-- A Telegram account
-- Telegram API credentials (API ID and API Hash)
 
-## Installation
-
-### 1. Install uv (if not already installed)
+### Install uv
 
 **macOS/Linux:**
 ```bash
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-**Windows:**
-```powershell
-powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
-```
-
-### 2. Get Telegram API Credentials
-
-1. Go to https://my.telegram.org
-2. Log in with your phone number
-3. Click on "API development tools"
-4. Create a new application (if you haven't already)
-5. Note down your `api_id` and `api_hash`
-
-### 3. Clone/Navigate to the Project
-
-```bash
-cd telegram_fwd
-```
-
-### 4. Create Virtual Environment and Install Dependencies
-
-Using `uv`:
+### Setup
 
 ```bash
 # Create virtual environment
 uv venv
 
-# Activate virtual environment
-# On macOS/Linux:
-source .venv/bin/activate
-# On Windows:
-.venv\Scripts\activate
+# Activate it
+source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate     # Windows
 
 # Install dependencies
 uv pip install -r requirements.txt
-```
 
-Alternatively, install dependencies directly with uv:
+# Configure
+cp .env.example .env
+nano .env
 
-```bash
-uv pip install pyrogram TgCrypto python-dotenv
-```
-
-### 5. Configure the Bot
-
-1. Copy the example environment file:
-   ```bash
-   cp .env.example .env
-   ```
-
-2. Edit `.env` and fill in your credentials:
-   ```env
-   API_ID=12345678
-   API_HASH=abcdef1234567890abcdef1234567890
-   PHONE_NUMBER=+1234567890
-   CONTACT_A=@source_username
-   CONTACT_B=@destination_username
-   ```
-
-   **Configuration Details:**
-   - `API_ID`: Your Telegram API ID (numeric)
-   - `API_HASH`: Your Telegram API Hash (32-character string)
-   - `PHONE_NUMBER`: Your Telegram phone number with country code (e.g., +1234567890)
-   - `CONTACT_A`: The username (with @) or user ID of the person whose messages you want to forward
-   - `CONTACT_B`: The username (with @) or user ID of the person to forward messages to
-
-## Usage
-
-### Start the Bot
-
-Make sure your virtual environment is activated, then run:
-
-```bash
+# Run
 python bot.py
 ```
 
-### First Run Authentication
+## Configuration Details
 
-On the first run, you'll be prompted to:
-1. Enter the verification code sent to your Telegram account
-2. If you have 2FA enabled, enter your password
+### Environment Variables
 
-The session will be saved, so you won't need to authenticate again unless you delete the session file.
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `API_ID` | Telegram API ID (numeric) | `12345678` |
+| `API_HASH` | Telegram API Hash | `abc123...` |
+| `PHONE_NUMBER` | Your phone number with country code | `+1234567890` |
+| `CONTACT_A` | Source contact (username or user ID) | `@john_doe` or `123456789` |
+| `CONTACT_B` | Destination contact (username or user ID) | `@jane_doe` or `987654321` |
 
-### What Happens
+### Finding Contact Information
 
-1. The bot logs into your Telegram account
-2. It resolves Contact A and Contact B to their user IDs
-3. It starts monitoring incoming messages
-4. When a message arrives from Contact A, it automatically forwards it to Contact B
-5. All activities are logged to the console
+**Option 1: Username**
+- Format: `@username` (include @)
+- Example: `CONTACT_A=@john_doe`
+
+**Option 2: User ID**
+- Find using @userinfobot on Telegram
+- Format: Just the number
+- Example: `CONTACT_A=123456789`
 
 ## How It Works
 
 ```
-Contact A sends message → Bot detects message → Bot forwards to Contact B
+Contact A sends message → Bot detects → Bot forwards to Contact B
 ```
 
-The bot uses:
-- **Pyrogram**: A modern, elegant and async Telegram client library
-- **TgCrypto**: Fast encryption library for Pyrogram
-- **python-dotenv**: Environment variable management
+The bot:
+1. Logs into your Telegram account using Pyrogram
+2. Resolves Contact A and Contact B to their user IDs
+3. Monitors incoming private messages
+4. When a message from Contact A arrives, forwards it to Contact B
+5. Handles Telegram rate limits automatically
+6. Logs all activities
 
 ## Project Structure
 
 ```
 telegram_fwd/
-├── bot.py              # Main bot script
-├── config.py           # Configuration loader
-├── requirements.txt    # Python dependencies
-├── pyproject.toml      # uv/pip project configuration
-├── .env.example        # Environment template
-├── .env                # Your credentials (not in git)
-├── .gitignore          # Git ignore rules
-└── README.md           # This file
+├── Dockerfile              # Docker container definition
+├── docker-compose.yml      # Docker orchestration
+├── .dockerignore          # Docker build exclusions
+├── bot.py                 # Main bot script
+├── config.py              # Configuration loader
+├── requirements.txt       # Python dependencies
+├── pyproject.toml         # Project metadata
+├── .env.example           # Configuration template
+├── .env                   # Your credentials (gitignored)
+├── .gitignore            # Git exclusions
+├── DOCKER.md             # Detailed Docker guide
+├── QUICKSTART.md         # Quick start guide
+└── LICENSE               # MIT License
 ```
 
-## Security Notes
+## Documentation
 
-⚠️ **Important Security Information:**
-
-- **Never share your API credentials or .env file**
-- The `.env` file is already in `.gitignore` - don't commit it!
-- This bot uses your personal Telegram account
-- Session files contain sensitive data - keep them secure
-- Be aware of Telegram's rate limits and terms of service
-- Use this bot responsibly and ethically
+- **[DOCKER.md](DOCKER.md)** - Complete Docker deployment guide
+- **[QUICKSTART.md](QUICKSTART.md)** - Quick start for local installation
+- **README.md** - This file
 
 ## Troubleshooting
 
 ### "Missing required configuration" error
 
-**Solution:** Make sure all fields in `.env` are filled correctly without extra spaces or quotes.
+Check that all fields in `.env` are filled correctly without quotes:
 
 ```env
 # ✅ Correct
@@ -167,144 +191,204 @@ API_ID=12345678
 
 # ❌ Wrong
 API_ID="12345678"
-API_ID = 12345678 
 ```
 
 ### "Failed to resolve contacts" error
 
-**Possible causes:**
-- Username is incorrect or doesn't exist
-- User ID is invalid
-- You don't have an existing conversation with the contact
-
-**Solution:** 
-- Verify usernames include the @ symbol
+- Verify usernames are correct (include @ symbol)
 - Ensure you've chatted with both contacts at least once
-- Try using numeric user IDs instead of usernames
+- Try using numeric user IDs instead
+
+### Docker: Container keeps restarting
+
+```bash
+# Check logs
+docker-compose logs telegram-forwarder
+
+# Common fixes:
+# 1. Verify .env configuration
+# 2. Re-authenticate (delete sessions/ directory)
+# 3. Check contact usernames/IDs are valid
+```
+
+### Authentication issues
+
+**Docker:**
+```bash
+docker-compose down
+rm -rf sessions/*.session*
+docker-compose up  # Run interactively
+```
+
+**Local:**
+```bash
+rm telegram_forwarder.session*
+python bot.py
+```
 
 ### FloodWait errors
 
-**What it means:** Telegram is rate-limiting your requests
-
-**Solution:** The bot automatically handles this by waiting. If it happens frequently:
+The bot automatically handles rate limiting. If it happens frequently:
 - Reduce message frequency
-- Wait a few hours before retrying
-- Check if you're being rate-limited on your account
+- Wait a few hours
+- Check if your account is restricted
 
-### "No module named 'pyrogram'" error
+## Security Notes
 
-**Solution:** Make sure your virtual environment is activated and dependencies are installed:
+⚠️ **Important:**
+
+- **Never share your API credentials or `.env` file**
+- `.env` is gitignored - keep it that way!
+- Session files contain sensitive data
+- This bot uses your **personal Telegram account**
+- Use responsibly and ethically
+- Be aware of Telegram's Terms of Service
+
+## Docker Security Best Practices
 
 ```bash
-source .venv/bin/activate  # On macOS/Linux
-uv pip install -r requirements.txt
+# Set proper permissions
+chmod 600 .env
+
+# Use Docker secrets in production
+# See DOCKER.md for details
 ```
 
-### Session file issues
+## Production Deployment
 
-If you encounter authentication problems:
+### Running 24/7 with Docker
 
-1. Delete the session file:
-   ```bash
-   rm telegram_forwarder.session*
-   ```
+Docker automatically restarts the container unless explicitly stopped:
 
-2. Run the bot again and re-authenticate
+```bash
+# Set restart policy in docker-compose.yml
+restart: unless-stopped  # Default
+restart: always         # Always restart
+```
+
+### Resource Monitoring
+
+```bash
+# Check resource usage
+docker stats telegram_forwarder_bot
+
+# View logs with timestamps
+docker-compose logs -t -f
+```
+
+### Backups
+
+```bash
+# Backup session files
+cp -r sessions/ sessions_backup/
+
+# Backup .env
+cp .env .env.backup
+```
 
 ## Advanced Usage
 
-### Using User IDs Instead of Usernames
+### Multiple Bot Instances
 
-If you know the user IDs, you can use them directly in `.env`:
-
-```env
-CONTACT_A=123456789
-CONTACT_B=987654321
-```
-
-To find a user ID, you can use bots like @userinfobot on Telegram.
-
-### Running as a Service
-
-To keep the bot running 24/7, consider using:
-
-**On Linux (systemd):**
-Create a service file at `/etc/systemd/system/telegram-forwarder.service`
-
-**Using screen/tmux:**
 ```bash
-screen -S telegram_bot
-python bot.py
-# Press Ctrl+A, then D to detach
+# Copy the directory
+cp -r telegram_fwd telegram_fwd_2
+
+# Edit the new .env with different contacts
+cd telegram_fwd_2
+nano .env
+
+# Run with different project name
+docker-compose -p bot2 up -d
 ```
 
-**Using nohup:**
-```bash
-nohup python bot.py > bot.log 2>&1 &
+### Custom Filtering
+
+Edit `bot.py` to add message filtering:
+
+```python
+@app.on_message(filters.private & ~filters.me)
+async def forward_message(client: Client, message: Message):
+    if message.from_user.id == contact_a_id:
+        # Add custom logic here
+        if message.text and "important" in message.text.lower():
+            await message.forward(contact_b_id)
 ```
-
-## Stopping the Bot
-
-Press `Ctrl+C` to stop the bot gracefully.
-
-## Common Use Cases
-
-- 📱 Forward work messages to personal account
-- 🔔 Create message backups
-- 📊 Monitor important contacts
-- 🤖 Integrate with other automation workflows
 
 ## Legal & Ethics
 
 ⚠️ **Important Disclaimers:**
 
-- This bot is for **educational and personal use only**
-- Always get **explicit permission** before forwarding someone's messages
+- For **educational and personal use only**
+- Get **explicit permission** before forwarding messages
 - Respect **privacy** and Telegram's Terms of Service
-- Unauthorized message forwarding may violate privacy laws in your jurisdiction
-- The authors are not responsible for misuse of this software
+- Unauthorized forwarding may violate privacy laws
+- Authors not responsible for misuse
 
 ## Contributing
 
-Feel free to submit issues and enhancement requests!
+Contributions welcome! Feel free to:
+- Submit bug reports
+- Request features
+- Improve documentation
+- Submit pull requests
 
-## License
+## Technologies Used
 
-MIT License - See LICENSE file for details
-
-## Support
-
-If you encounter issues:
-
-1. Check the troubleshooting section above
-2. Review the logs for error messages
-3. Ensure your Telegram API credentials are valid
-4. Verify that both contacts exist and are accessible
+- **[Pyrogram](https://docs.pyrogram.org/)** - Telegram MTProto API Framework
+- **[TgCrypto](https://github.com/pyrogram/tgcrypto)** - Fast encryption for Pyrogram
+- **[python-dotenv](https://github.com/theskumar/python-dotenv)** - Environment management
+- **[Docker](https://www.docker.com/)** - Containerization platform
+- **[uv](https://github.com/astral-sh/uv)** - Fast Python package manager
 
 ## FAQ
 
 **Q: Can I forward messages from multiple contacts?**
-A: Currently, the bot supports one Contact A → Contact B pair. You'd need to run multiple instances for multiple pairs.
+A: Currently supports one A→B pair. Run multiple instances for multiple pairs.
 
 **Q: Does this work with groups/channels?**
-A: The current version only supports private messages. Group/channel support would require modifications.
+A: Currently only private messages. Group support requires modifications.
 
-**Q: Will contacts know their messages are being forwarded?**
-A: Forwarded messages show a "Forwarded from" label in Telegram, so yes, Contact B will see the messages are forwarded.
-
-**Q: Can I modify messages before forwarding?**
-A: Yes! Modify the `forward_message` function in `bot.py` to edit message content before forwarding.
+**Q: Will contacts know their messages are forwarded?**
+A: Yes, Telegram shows "Forwarded from" label on forwarded messages.
 
 **Q: Is this a bot account or user account?**
-A: This uses your **user account**, not a bot account. That's why it can forward messages between contacts.
+A: **User account** - that's why it can access and forward messages between contacts.
+
+**Q: How much does it cost to run?**
+A: Free! Uses minimal resources (~50-100MB RAM, minimal CPU).
+
+**Q: Can I run on Raspberry Pi?**
+A: Yes! Docker supports ARM architecture.
+
+**Q: What if I want to modify messages before forwarding?**
+A: Edit the `forward_message()` function in `bot.py` to customize behavior.
+
+## Support
+
+Having issues?
+
+1. Check troubleshooting section above
+2. Review logs: `docker-compose logs -f`
+3. Read [DOCKER.md](DOCKER.md) for Docker-specific help
+4. Verify API credentials are valid
+5. Ensure contacts exist and are accessible
+
+## License
+
+MIT License - See [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-Built with:
-- [Pyrogram](https://docs.pyrogram.org/) - Telegram MTProto API Framework
-- [uv](https://github.com/astral-sh/uv) - Fast Python package manager
-- [python-dotenv](https://github.com/theskumar/python-dotenv) - Environment variable management
+Built with ❤️ for Telegram automation enthusiasts.
+
+Special thanks to:
+- Pyrogram developers for excellent Telegram API framework
+- Docker community for containerization best practices
+- uv team for blazing-fast Python package management
 
 ---
 
-**Made with ❤️ for Telegram automation enthusiasts**
+**Ready to forward! 🚀**
+
+Star ⭐ this repo if you find it useful!

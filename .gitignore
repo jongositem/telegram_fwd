@@ -16,6 +16,11 @@ __pycache__/
 venv/
 .uv/
 
+# Docker
+sessions/
+*.session
+*.session-journal
+
 # IDE
 .vscode/
 .idea/

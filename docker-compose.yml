@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  telegram-forwarder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram_forwarder_bot
+    restart: unless-stopped
+
+    # Environment variables from .env file
+    env_file:
+      - .env
+
+    # Mount volume for persistent session files
+    volumes:
+      - ./sessions:/app/sessions
+      - ./.env:/app/.env:ro
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+    # Resource limits (optional, adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
