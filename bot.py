@@ -10,6 +10,21 @@ from pyrogram.errors import FloodWait
 import asyncio
 import logging
 from config import Config
+import os
+
+# Determine session path
+if os.path.exists('/app/sessions'):
+    SESSION_PATH = '/app/sessions/telegram_forwarder'
+else:
+    SESSION_PATH = 'telegram_forwarder'
+
+# Then use SESSION_PATH when creating Client:
+app = Client(
+    SESSION_PATH,
+    api_id=Config.API_ID,
+    api_hash=Config.API_HASH,
+    phone_number=Config.PHONE_NUMBER
+)
 
 # Configure logging
 logging.basicConfig(
