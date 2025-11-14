@@ -9,22 +9,8 @@ from pyrogram.types import Message
 from pyrogram.errors import FloodWait
 import asyncio
 import logging
-from config import Config
 import os
-
-# Determine session path
-if os.path.exists('/app/sessions'):
-    SESSION_PATH = '/app/sessions/telegram_forwarder'
-else:
-    SESSION_PATH = 'telegram_forwarder'
-
-# Then use SESSION_PATH when creating Client:
-app = Client(
-    SESSION_PATH,
-    api_id=Config.API_ID,
-    api_hash=Config.API_HASH,
-    phone_number=Config.PHONE_NUMBER
-)
+from config import Config
 
 # Configure logging
 logging.basicConfig(
@@ -40,9 +26,38 @@ except ValueError as e:
     logger.error(f"Configuration error: {e}")
     exit(1)
 
+# Determine session file path
+# Priority: 1. /app/sessions/ (Docker), 2. Current directory
+SESSION_NAME = "telegram_forwarder"
+
+def get_session_path():
+    """Determine the correct session file path"""
+    # Check Docker location first
+    docker_session = f"/app/sessions/{SESSION_NAME}.session"
+    if os.path.exists(docker_session):
+        logger.info(f"✅ Found session in Docker volume: {docker_session}")
+        return f"/app/sessions/{SESSION_NAME}"
+
+    # Check if we're in Docker but session doesn't exist yet
+    if os.path.exists('/app/sessions'):
+        logger.info(f"📁 Using Docker session path (new session): /app/sessions/{SESSION_NAME}")
+        return f"/app/sessions/{SESSION_NAME}"
+
+    # Check local directory
+    local_session = f"{SESSION_NAME}.session"
+    if os.path.exists(local_session):
+        logger.info(f"✅ Found local session: {local_session}")
+        return SESSION_NAME
+
+    # Default to local
+    logger.info(f"📁 Using local session path (new session): {SESSION_NAME}")
+    return SESSION_NAME
+
+SESSION_PATH = get_session_path()
+
 # Initialize the Pyrogram client (user account)
 app = Client(
-    "telegram_forwarder",
+    SESSION_PATH,
     api_id=Config.API_ID,
     api_hash=Config.API_HASH,
     phone_number=Config.PHONE_NUMBER
@@ -89,7 +104,7 @@ async def cache_peer(client: Client, user_id: int, name: str):
     try:
         logger.info(f"Caching {name}...")
 
-        # Method 1: Try direct resolve
+        # Try direct resolve
         try:
             await client.resolve_peer(user_id)
             logger.info(f"✅ {name} peer already cached")
@@ -97,7 +112,7 @@ async def cache_peer(client: Client, user_id: int, name: str):
         except:
             pass
 
-        # Method 2: Fetch dialogs to populate cache
+        # Fetch dialogs to populate cache
         logger.info(f"Fetching dialogs to cache {name}...")
         dialog_count = 0
         found = False
@@ -110,14 +125,12 @@ async def cache_peer(client: Client, user_id: int, name: str):
                 break
 
         if found:
-            # Try resolve again
             await asyncio.sleep(1)
             await client.resolve_peer(user_id)
             logger.info(f"✅ {name} peer cached successfully")
             return True
         else:
             logger.warning(f"⚠️  {name} not found in recent dialogs")
-            logger.warning(f"   Message forwarding may fail - ensure you have an active chat")
             return False
 
     except Exception as e:
@@ -129,200 +142,127 @@ async def cache_peer(client: Client, user_id: int, name: str):
 async def forward_message(client: Client, message: Message):
     """
     Forward messages from Contact A to Contact B
-    Uses message copying as fallback for peer resolution issues
     """
     global contact_a_id, contact_b_id
 
-    # Check if the message is from Contact A
     if message.from_user.id == contact_a_id:
         try:
             logger.info(f"📨 Received message from {message.from_user.first_name} (ID: {contact_a_id})")
 
-            # Try standard forward first (preserves "Forwarded from" label)
+            # Try forward first
             try:
                 await message.forward(contact_b_id)
                 logger.info(f"✅ Message forwarded to Contact B (ID: {contact_b_id})")
                 return
 
             except Exception as forward_error:
-                # If forward fails due to peer issues, try copying instead
                 if "PEER_ID_INVALID" in str(forward_error) or "peer" in str(forward_error).lower():
-                    logger.warning(f"⚠️  Forward failed, trying copy method: {forward_error}")
+                    logger.warning(f"⚠️  Forward failed, trying copy method")
 
-                    # Copy message based on type
+                    # Copy based on message type
                     if message.text:
-                        # Text message
-                        await client.send_message(
-                            contact_b_id,
-                            message.text,
-                            parse_mode=message.parse_mode
-                        )
+                        await client.send_message(contact_b_id, message.text)
                         logger.info(f"✅ Text message copied to Contact B")
-
                     elif message.photo:
-                        # Photo message
-                        await client.send_photo(
-                            contact_b_id,
-                            message.photo.file_id,
-                            caption=message.caption or "",
-                            parse_mode=message.parse_mode
-                        )
+                        await client.send_photo(contact_b_id, message.photo.file_id, caption=message.caption or "")
                         logger.info(f"✅ Photo copied to Contact B")
-
                     elif message.video:
-                        # Video message
-                        await client.send_video(
-                            contact_b_id,
-                            message.video.file_id,
-                            caption=message.caption or "",
-                            parse_mode=message.parse_mode
-                        )
+                        await client.send_video(contact_b_id, message.video.file_id, caption=message.caption or "")
                         logger.info(f"✅ Video copied to Contact B")
-
                     elif message.document:
-                        # Document/file message
-                        await client.send_document(
-                            contact_b_id,
-                            message.document.file_id,
-                            caption=message.caption or "",
-                            parse_mode=message.parse_mode
-                        )
+                        await client.send_document(contact_b_id, message.document.file_id, caption=message.caption or "")
                         logger.info(f"✅ Document copied to Contact B")
-
                     elif message.voice:
-                        # Voice message
-                        await client.send_voice(
-                            contact_b_id,
-                            message.voice.file_id,
-                            caption=message.caption or ""
-                        )
-                        logger.info(f"✅ Voice message copied to Contact B")
-
+                        await client.send_voice(contact_b_id, message.voice.file_id)
+                        logger.info(f"✅ Voice copied to Contact B")
                     elif message.audio:
-                        # Audio message
-                        await client.send_audio(
-                            contact_b_id,
-                            message.audio.file_id,
-                            caption=message.caption or "",
-                            parse_mode=message.parse_mode
-                        )
+                        await client.send_audio(contact_b_id, message.audio.file_id, caption=message.caption or "")
                         logger.info(f"✅ Audio copied to Contact B")
-
                     elif message.sticker:
-                        # Sticker
-                        await client.send_sticker(
-                            contact_b_id,
-                            message.sticker.file_id
-                        )
+                        await client.send_sticker(contact_b_id, message.sticker.file_id)
                         logger.info(f"✅ Sticker copied to Contact B")
-
-                    elif message.animation:
-                        # GIF/Animation
-                        await client.send_animation(
-                            contact_b_id,
-                            message.animation.file_id,
-                            caption=message.caption or ""
-                        )
-                        logger.info(f"✅ Animation copied to Contact B")
-
-                    elif message.video_note:
-                        # Video note (round video)
-                        await client.send_video_note(
-                            contact_b_id,
-                            message.video_note.file_id
-                        )
-                        logger.info(f"✅ Video note copied to Contact B")
-
-                    elif message.location:
-                        # Location
-                        await client.send_location(
-                            contact_b_id,
-                            latitude=message.location.latitude,
-                            longitude=message.location.longitude
-                        )
-                        logger.info(f"✅ Location copied to Contact B")
-
-                    elif message.contact:
-                        # Contact card
-                        await client.send_contact(
-                            contact_b_id,
-                            phone_number=message.contact.phone_number,
-                            first_name=message.contact.first_name,
-                            last_name=message.contact.last_name or ""
-                        )
-                        logger.info(f"✅ Contact copied to Contact B")
-
-                    elif message.poll:
-                        # Poll
-                        logger.warning(f"⚠️  Polls cannot be copied - skipping")
-
                     else:
-                        # Fallback: use generic copy
                         await message.copy(contact_b_id)
-                        logger.info(f"✅ Message copied to Contact B (generic)")
-
+                        logger.info(f"✅ Message copied to Contact B")
                 else:
-                    # If it's a different error, re-raise it
                     raise forward_error
 
         except FloodWait as e:
-            # Handle rate limiting
             logger.warning(f"⏳ FloodWait: sleeping for {e.value} seconds")
             await asyncio.sleep(e.value)
-
-            # Retry with copy method
             try:
                 await message.copy(contact_b_id)
-                logger.info(f"✅ Message copied to Contact B after FloodWait")
+                logger.info(f"✅ Message copied after FloodWait")
             except Exception as retry_error:
-                logger.error(f"❌ Failed to send after FloodWait: {retry_error}")
+                logger.error(f"❌ Failed after FloodWait: {retry_error}")
 
         except Exception as e:
             logger.error(f"❌ Error processing message: {e}")
-
-            # Provide helpful troubleshooting info
-            if "PEER_ID_INVALID" in str(e):
-                logger.error(f"   💡 Contact B (ID: {contact_b_id}) is not accessible")
-                logger.error(f"   Solutions:")
-                logger.error(f"   1. Ensure you have an active chat with Contact B")
-                logger.error(f"   2. Send Contact B a message manually in Telegram")
-                logger.error(f"   3. Ask Contact B to send you a message")
-                logger.error(f"   4. Restart the bot after establishing contact")
 
 
 async def main():
     """Main function to start the bot"""
     global contact_a_id, contact_b_id
 
-    await app.start()
-    logger.info("🤖 Bot started successfully!")
+    # Check for session file
+    session_file = f"{SESSION_PATH}.session"
+    if os.path.exists(session_file):
+        logger.info(f"✅ Session file exists: {session_file}")
+    else:
+        logger.error(f"❌ Session file NOT found: {session_file}")
+        logger.error(f"   Expected location: {session_file}")
+        logger.error(f"   Current directory: {os.getcwd()}")
+        logger.error(f"   Files in current directory:")
+        for f in os.listdir(os.getcwd()):
+            logger.error(f"     - {f}")
 
-    # Resolve contact identifiers to user IDs
+        if os.path.exists('/app/sessions'):
+            logger.error(f"   Files in /app/sessions:")
+            for f in os.listdir('/app/sessions'):
+                logger.error(f"     - {f}")
+
+        logger.error("")
+        logger.error("🔧 To fix this:")
+        logger.error("   1. Stop the container: docker-compose down")
+        logger.error("   2. Authenticate locally: python3 bot.py")
+        logger.error("   3. Copy session: cp telegram_forwarder.session* sessions/")
+        logger.error("   4. Restart Docker: docker-compose up -d")
+        logger.error("")
+
+        # Exit to prevent interactive prompt in Docker
+        exit(1)
+
+    try:
+        await app.start()
+        logger.info("🤖 Bot started successfully!")
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+        logger.error("   Session file may be corrupted or invalid")
+        logger.error("   Delete sessions and re-authenticate")
+        exit(1)
+
+    # Resolve contacts
     logger.info("🔍 Resolving contacts...")
     contact_a_id = await get_contact_id(app, Config.CONTACT_A)
     contact_b_id = await get_contact_id(app, Config.CONTACT_B)
 
     if not contact_a_id or not contact_b_id:
-        logger.error("❌ Failed to resolve one or both contacts. Please check your configuration.")
+        logger.error("❌ Failed to resolve contacts")
         await app.stop()
         return
 
     logger.info(f"📋 Contact A ID: {contact_a_id}")
     logger.info(f"📋 Contact B ID: {contact_b_id}")
 
-    # Attempt to cache peers
-    logger.info("🔄 Attempting to cache peer information...")
+    # Cache peers
+    logger.info("🔄 Caching peer information...")
     await cache_peer(app, contact_a_id, "Contact A")
     await cache_peer(app, contact_b_id, "Contact B")
 
     logger.info("✅ Bot is ready!")
     logger.info("👂 Listening for messages from Contact A...")
-    logger.info("")
-    logger.info("📝 Note: If forwarding fails, the bot will automatically")
-    logger.info("   try copying the message instead (without 'Forwarded from' label)")
-    logger.info("")
 
-    # Keep the bot running
+    # Keep running
     await asyncio.Event().wait()
 
 
